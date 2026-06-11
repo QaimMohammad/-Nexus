@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, PieChart, Filter, Search, PlusCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -8,19 +8,30 @@ import { Badge } from '../../components/ui/Badge';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { useAuth } from '../../context/AuthContext';
 import { Entrepreneur } from '../../types';
-import { entrepreneurs } from '../../data/users';
-import { getRequestsFromInvestor } from '../../data/collaborationRequests';
+import { userService } from '../../services/userService';
+import { collaborationService, ApiCollaborationRequest } from '../../services/collaborationService';
 
 export const InvestorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
-  
+  const [entrepreneurs, setEntrepreneurs] = useState<Entrepreneur[]>([]);
+  const [sentRequests, setSentRequests] = useState<ApiCollaborationRequest[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      userService
+        .listUsers('entrepreneur')
+        .then((users) => setEntrepreneurs(users as Entrepreneur[]))
+        .catch(() => setEntrepreneurs([]));
+      collaborationService
+        .listRequests()
+        .then(setSentRequests)
+        .catch(() => setSentRequests([]));
+    }
+  }, [user]);
+
   if (!user) return null;
-  
-  // Get collaboration requests sent by this investor
-  const sentRequests = getRequestsFromInvestor(user.id);
-  const requestedEntrepreneurIds = sentRequests.map(req => req.entrepreneurId);
   
   // Filter entrepreneurs based on search and industry filters
   const filteredEntrepreneurs = entrepreneurs.filter(entrepreneur => {

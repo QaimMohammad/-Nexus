@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, MapPin } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
-import { entrepreneurs } from '../../data/users';
+import { userService } from '../../services/userService';
+import { Entrepreneur } from '../../types';
 
 export const EntrepreneursPage: React.FC = () => {
+  const [entrepreneurs, setEntrepreneurs] = useState<Entrepreneur[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedFundingRange, setSelectedFundingRange] = useState<string[]>([]);
+
+  useEffect(() => {
+    userService
+      .listUsers('entrepreneur')
+      .then((users) => setEntrepreneurs(users as Entrepreneur[]))
+      .catch((err) => toast.error((err as Error).message))
+      .finally(() => setIsLoading(false));
+  }, []);
   
   // Get unique industries and funding ranges
   const allIndustries = Array.from(new Set(entrepreneurs.map(e => e.industry)));
@@ -151,6 +162,9 @@ export const EntrepreneursPage: React.FC = () => {
             </div>
           </div>
           
+          {isLoading && (
+            <div className="text-center py-12 text-gray-500">Loading entrepreneurs...</div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredEntrepreneurs.map(entrepreneur => (
               <EntrepreneurCard

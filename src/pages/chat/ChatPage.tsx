@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Send, Phone, Video, Info, Smile } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ChatMessage } from '../../components/chat/ChatMessage';
 import { ChatUserList } from '../../components/chat/ChatUserList';
 import { useAuth } from '../../context/AuthContext';
-import { Message } from '../../types';
-import { findUserById } from '../../data/users';
-import { getMessagesBetweenUsers, sendMessage, getConversationsForUser } from '../../data/messages';
+import { Message, User } from '../../types';
+import { userService } from '../../services/userService';
+import { messageService, ApiConversation } from '../../services/messageService';
+import { getSocket } from '../../services/socket';
 import { MessageCircle } from 'lucide-react';
 
 export const ChatPage: React.FC = () => {
@@ -17,48 +19,69 @@ export const ChatPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<ApiConversation[]>([]);
+  const [chatPartner, setChatPartner] = useState<User | null>(null);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
-  
-  const chatPartner = userId ? findUserById(userId) : null;
-  
+
+  const refreshConversations = () => {
+    messageService.listConversations().then(setConversations).catch(() => setConversations([]));
+  };
+
   useEffect(() => {
-    // Load conversations
     if (currentUser) {
-      setConversations(getConversationsForUser(currentUser.id));
+      refreshConversations();
     }
   }, [currentUser]);
-  
+
+  // Load the chat partner profile and message history
   useEffect(() => {
-    // Load messages between users
-    if (currentUser && userId) {
-      setMessages(getMessagesBetweenUsers(currentUser.id, userId));
+    if (!userId) {
+      setChatPartner(null);
+      setMessages([]);
+      return;
     }
+    userService.getUser(userId).then(setChatPartner).catch(() => setChatPartner(null));
+    messageService.getMessagesWith(userId).then(setMessages).catch(() => setMessages([]));
+  }, [userId]);
+
+  // Real-time: append messages pushed by the server over Socket.IO
+  useEffect(() => {
+    if (!currentUser) return;
+    const socket = getSocket();
+    const onMessage = (message: Message) => {
+      if (userId && message.senderId === userId) {
+        setMessages((prev) => [...prev, message]);
+      }
+      refreshConversations();
+    };
+    socket.on('chat:message', onMessage);
+    return () => {
+      socket.off('chat:message', onMessage);
+    };
   }, [currentUser, userId]);
-  
+
   useEffect(() => {
     // Scroll to bottom of messages
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  
-  const handleSendMessage = (e: React.FormEvent) => {
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newMessage.trim() || !currentUser || !userId) return;
-    
-    const message = sendMessage({
-      senderId: currentUser.id,
-      receiverId: userId,
-      content: newMessage
-    });
-    
-    setMessages([...messages, message]);
+
+    const content = newMessage;
     setNewMessage('');
-    
-    // Update conversations
-    setConversations(getConversationsForUser(currentUser.id));
+    try {
+      const message = await messageService.sendMessage(userId, content);
+      setMessages((prev) => [...prev, message]);
+      refreshConversations();
+    } catch (err) {
+      toast.error((err as Error).message);
+      setNewMessage(content);
+    }
   };
-  
+
   if (!currentUser) return null;
   
   return (
@@ -130,6 +153,7 @@ export const ChatPage: React.FC = () => {
                       key={message.id}
                       message={message}
                       isCurrentUser={message.senderId === currentUser.id}
+                      sender={message.senderId === currentUser.id ? currentUser : chatPartner}
                     />
                   ))}
                   <div ref={messagesEndRef} />

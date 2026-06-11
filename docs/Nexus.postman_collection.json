@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "Nexus API",
+    "description": "Investor & Entrepreneur Collaboration Platform API. Set {{baseUrl}} (e.g. http://localhost:5000/api) and {{token}} collection variables. Login first; the token is captured automatically by the Login request's test script.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "token", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"entrepreneur\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sarah@techwave.io\",\n  \"password\": \"password123\",\n  \"role\": \"entrepreneur\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"<userId from login>\",\n  \"otp\": \"123456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/forgot-password",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"sarah@techwave.io\"\n}" }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<devResetToken>\",\n  \"password\": \"newpassword123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users?role=investor",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"],
+              "query": [
+                { "key": "role", "value": "investor" },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User",
+          "request": { "method": "GET", "url": "{{baseUrl}}/users/:id" }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/users/:id",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bio\": \"Updated bio\",\n  \"twoFactorEnabled\": false\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Collaborations",
+      "item": [
+        {
+          "name": "Create Request (investor)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/collaborations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entrepreneurId\": \"<id>\",\n  \"message\": \"Interested in your startup\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Requests",
+          "request": { "method": "GET", "url": "{{baseUrl}}/collaborations" }
+        },
+        {
+          "name": "Respond (entrepreneur)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/collaborations/:id",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"accepted\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Conversations",
+          "request": { "method": "GET", "url": "{{baseUrl}}/messages/conversations" }
+        },
+        {
+          "name": "History With User",
+          "request": { "method": "GET", "url": "{{baseUrl}}/messages/:userId" }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": \"<id>\",\n  \"content\": \"Hello!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Meetings",
+      "item": [
+        {
+          "name": "Create Meeting",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meetings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participantId\": \"<id>\",\n  \"title\": \"Pitch discussion\",\n  \"description\": \"Series A intro call\",\n  \"startTime\": \"2026-07-01T15:00:00.000Z\",\n  \"endTime\": \"2026-07-01T15:30:00.000Z\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Meetings",
+          "request": { "method": "GET", "url": "{{baseUrl}}/meetings" }
+        },
+        {
+          "name": "Respond (invitee)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/meetings/:id/respond",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"accepted\"\n}" }
+          }
+        },
+        {
+          "name": "Cancel (organizer)",
+          "request": { "method": "PUT", "url": "{{baseUrl}}/meetings/:id/cancel" }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Upload",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/documents",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] },
+                { "key": "name", "value": "Pitch Deck", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List",
+          "request": { "method": "GET", "url": "{{baseUrl}}/documents" }
+        },
+        {
+          "name": "Download / Preview",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents/:id/download?inline=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", ":id", "download"],
+              "query": [{ "key": "inline", "value": "true" }]
+            }
+          }
+        },
+        {
+          "name": "Share",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/documents/:id/share",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"<id>\"\n}" }
+          }
+        },
+        {
+          "name": "Sign (e-signature)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/documents/:id/sign",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signature\": \"data:image/png;base64,iVBORw0KGgo...\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/documents/:id" }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Wallet",
+          "request": { "method": "GET", "url": "{{baseUrl}}/payments/wallet" }
+        },
+        {
+          "name": "Deposit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/payments/deposit",
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 500\n}" }
+          }
+        },
+        {
+          "name": "Withdraw",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/payments/withdraw",
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 200\n}" }
+          }
+        },
+        {
+          "name": "Transfer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/payments/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"<id>\",\n  \"amount\": 100,\n  \"note\": \"Seed contribution\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Transactions",
+          "request": { "method": "GET", "url": "{{baseUrl}}/payments/transactions" }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+        }
+      ]
+    }
+  ]
+}

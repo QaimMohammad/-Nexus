@@ -7,20 +7,25 @@ import { Badge } from '../../components/ui/Badge';
 import { CollaborationRequestCard } from '../../components/collaboration/CollaborationRequestCard';
 import { InvestorCard } from '../../components/investor/InvestorCard';
 import { useAuth } from '../../context/AuthContext';
-import { CollaborationRequest } from '../../types';
-import { getRequestsForEntrepreneur } from '../../data/collaborationRequests';
-import { investors } from '../../data/users';
+import { CollaborationRequest, Investor } from '../../types';
+import { collaborationService } from '../../services/collaborationService';
+import { userService } from '../../services/userService';
 
 export const EntrepreneurDashboard: React.FC = () => {
   const { user } = useAuth();
   const [collaborationRequests, setCollaborationRequests] = useState<CollaborationRequest[]>([]);
-  const [recommendedInvestors, setRecommendedInvestors] = useState(investors.slice(0, 3));
-  
+  const [recommendedInvestors, setRecommendedInvestors] = useState<Investor[]>([]);
+
   useEffect(() => {
     if (user) {
-      // Load collaboration requests
-      const requests = getRequestsForEntrepreneur(user.id);
-      setCollaborationRequests(requests);
+      collaborationService
+        .listRequests()
+        .then((requests) => setCollaborationRequests(requests as unknown as CollaborationRequest[]))
+        .catch(() => setCollaborationRequests([]));
+      userService
+        .listUsers('investor')
+        .then((users) => setRecommendedInvestors((users as Investor[]).slice(0, 3)))
+        .catch(() => setRecommendedInvestors([]));
     }
   }, [user]);
   

@@ -1,15 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, MapPin } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { InvestorCard } from '../../components/investor/InvestorCard';
-import { investors } from '../../data/users';
+import { userService } from '../../services/userService';
+import { Investor } from '../../types';
 
 export const InvestorsPage: React.FC = () => {
+  const [investors, setInvestors] = useState<Investor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+
+  useEffect(() => {
+    userService
+      .listUsers('investor')
+      .then((users) => setInvestors(users as Investor[]))
+      .catch((err) => toast.error((err as Error).message))
+      .finally(() => setIsLoading(false));
+  }, []);
   
   // Get unique investment stages and interests
   const allStages = Array.from(new Set(investors.flatMap(i => i.investmentStage)));
@@ -139,14 +151,18 @@ export const InvestorsPage: React.FC = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredInvestors.map(investor => (
-              <InvestorCard
-                key={investor.id}
-                investor={investor}
-              />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="text-center py-12 text-gray-500">Loading investors...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredInvestors.map(investor => (
+                <InvestorCard
+                  key={investor.id}
+                  investor={investor}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

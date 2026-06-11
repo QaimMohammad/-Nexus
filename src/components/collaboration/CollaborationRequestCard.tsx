@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, X, MessageCircle } from 'lucide-react';
-import { CollaborationRequest } from '../../types';
+import toast from 'react-hot-toast';
+import { CollaborationRequest, User } from '../../types';
 import { Card, CardBody, CardFooter } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { findUserById } from '../../data/users';
-import { updateRequestStatus } from '../../data/collaborationRequests';
+import { collaborationService } from '../../services/collaborationService';
 import { formatDistanceToNow } from 'date-fns';
 
 interface CollaborationRequestCardProps {
@@ -20,23 +20,27 @@ export const CollaborationRequestCard: React.FC<CollaborationRequestCardProps> =
   onStatusUpdate
 }) => {
   const navigate = useNavigate();
-  const investor = findUserById(request.investorId);
-  
+  const [isResponding, setIsResponding] = useState(false);
+  // The API returns the investor populated on the request
+  const investor = typeof request.investorId === 'object' ? (request.investorId as User) : null;
+
   if (!investor) return null;
-  
-  const handleAccept = () => {
-    updateRequestStatus(request.id, 'accepted');
-    if (onStatusUpdate) {
-      onStatusUpdate(request.id, 'accepted');
+
+  const respond = async (status: 'accepted' | 'rejected') => {
+    setIsResponding(true);
+    try {
+      await collaborationService.respond(request.id, status);
+      onStatusUpdate?.(request.id, status);
+      toast.success(`Request ${status}`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setIsResponding(false);
     }
   };
-  
-  const handleReject = () => {
-    updateRequestStatus(request.id, 'rejected');
-    if (onStatusUpdate) {
-      onStatusUpdate(request.id, 'rejected');
-    }
-  };
+
+  const handleAccept = () => respond('accepted');
+  const handleReject = () => respond('rejected');
   
   const handleMessage = () => {
     navigate(`/chat/${investor.id}`);
@@ -97,6 +101,7 @@ export const CollaborationRequestCard: React.FC<CollaborationRequestCardProps> =
                 size="sm"
                 leftIcon={<X size={16} />}
                 onClick={handleReject}
+                isLoading={isResponding}
               >
                 Decline
               </Button>
@@ -105,6 +110,7 @@ export const CollaborationRequestCard: React.FC<CollaborationRequestCardProps> =
                 size="sm"
                 leftIcon={<Check size={16} />}
                 onClick={handleAccept}
+                isLoading={isResponding}
               >
                 Accept
               </Button>

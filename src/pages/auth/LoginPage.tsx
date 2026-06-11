@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, CircleDollarSign, Building2, LogIn, AlertCircle } from 'lucide-react';
+import { User, CircleDollarSign, Building2, LogIn, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -12,18 +12,40 @@ export const LoginPage: React.FC = () => {
   const [role, setRole] = useState<UserRole>('entrepreneur');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { login } = useAuth();
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const [otp, setOtp] = useState('');
+
+  const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    
+
     try {
-      await login(email, password, role);
+      const result = await login(email, password, role);
+      if (result.requiresOtp) {
+        // 2FA is enabled for this account - ask for the emailed code
+        setAwaitingOtp(true);
+        setIsLoading(false);
+        return;
+      }
       // Redirect based on user role
+      navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+    } catch (err) {
+      setError((err as Error).message);
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await verifyOtp(otp);
       navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
     } catch (err) {
       setError((err as Error).message);
@@ -70,7 +92,45 @@ export const LoginPage: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
-          
+
+          {awaitingOtp ? (
+            <form className="space-y-6" onSubmit={handleOtpSubmit}>
+              <div className="text-center">
+                <ShieldCheck size={32} className="mx-auto text-primary-600 mb-2" />
+                <h3 className="text-lg font-medium text-gray-900">Two-factor verification</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Enter the 6-digit code sent to your email
+                </p>
+              </div>
+
+              <Input
+                label="Verification code"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                required
+                fullWidth
+              />
+
+              <Button type="submit" fullWidth isLoading={isLoading} leftIcon={<ShieldCheck size={18} />}>
+                Verify and sign in
+              </Button>
+
+              <button
+                type="button"
+                className="w-full text-sm text-gray-600 hover:text-gray-900"
+                onClick={() => {
+                  setAwaitingOtp(false);
+                  setOtp('');
+                  setError(null);
+                }}
+              >
+                Back to login
+              </button>
+            </form>
+          ) : (
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -138,9 +198,9 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+                <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
             </div>
             
@@ -153,7 +213,9 @@ export const LoginPage: React.FC = () => {
               Sign in
             </Button>
           </form>
-          
+          )}
+
+
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

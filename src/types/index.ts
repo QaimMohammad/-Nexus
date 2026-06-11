@@ -50,8 +50,9 @@ export interface ChatConversation {
 
 export interface CollaborationRequest {
   id: string;
-  investorId: string;
-  entrepreneurId: string;
+  // Populated User objects when fetched from the API
+  investorId: string | User;
+  entrepreneurId: string | User;
   message: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
@@ -70,7 +71,8 @@ export interface Document {
 
 export interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: UserRole) => Promise<void>;
+  login: (email: string, password: string, role: UserRole) => Promise<{ requiresOtp: boolean }>;
+  verifyOtp: (otp: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
