@@ -8,6 +8,8 @@ export interface User {
   avatarUrl: string;
   bio: string;
   isOnline?: boolean;
+  twoFactorEnabled?: boolean;
+  walletBalance?: number;
   createdAt: string;
 }
 

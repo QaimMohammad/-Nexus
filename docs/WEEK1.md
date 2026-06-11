@@ -68,14 +68,6 @@ Demo accounts (auto-seeded): all use password `password123`
 
 ## Status of later-week milestones
 
-The backend for Weeks 2–3 was scaffolded in the same pass and is already
-functional and documented in [API.md](API.md):
-
-- Meetings with double-booking conflict detection (Milestone 3) — done (API).
-- WebRTC signaling over Socket.IO (Milestone 4) — done (server side);
-  frontend call UI pending.
-- Document chamber: upload (Multer), metadata, share, e-signature storage
-  (Milestone 5) — done (API); frontend page wiring pending.
-- Mock payments: wallet, deposit/withdraw/transfer, transaction history
-  (Milestone 6) — done (API); frontend dashboard pending.
-- Security enhancements (Milestone 7) — done.
+The backend for Weeks 2–3 was scaffolded in the same pass; all milestones
+(backend **and** frontend) are now complete — see [WEEK2.md](WEEK2.md) and
+[WEEK3.md](WEEK3.md).

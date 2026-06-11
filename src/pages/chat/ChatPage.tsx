@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Send, Phone, Video, Info, Smile } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Avatar } from '../../components/ui/Avatar';
@@ -16,6 +16,7 @@ import { MessageCircle } from 'lucide-react';
 
 export const ChatPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -129,6 +130,21 @@ export const ChatPage: React.FC = () => {
                   size="sm"
                   className="rounded-full p-2"
                   aria-label="Video call"
+                  onClick={async () => {
+                    if (!userId) return;
+                    // Deterministic room: both participants land in the same call
+                    const roomId = `chat-${[currentUser.id, userId].sort().join('-')}`;
+                    try {
+                      const msg = await messageService.sendMessage(
+                        userId,
+                        'Started a video call - open our chat and click the camera icon to join.'
+                      );
+                      setMessages((prev) => [...prev, msg]);
+                    } catch {
+                      /* the call still works without the notification message */
+                    }
+                    navigate(`/call/${roomId}`);
+                  }}
                 >
                   <Video size={18} />
                 </Button>
