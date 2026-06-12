@@ -31,9 +31,12 @@
   candidates relayed through the backend; STUN via Google's public server.
 - Features: join room, camera preview, **toggle audio/video** (state also
   broadcast to peers), participant name overlays, copy-invite-link, **end call**.
-- Entry points: "Join Call" on accepted meetings, and the camera button in
-  any chat (both participants derive the same deterministic room id, and a
-  chat message invites the other side).
+- **Audio-only mode** (`/call/:roomId?mode=audio`): requests microphone only,
+  hides the video toggle, labels the call "Voice Call" — used by the chat
+  phone button. The camera button starts a full video call.
+- Entry points: "Join Call" on accepted meetings, plus the phone (voice) and
+  camera (video) buttons in any chat. Both participants derive the same
+  deterministic room id, and a chat message invites the other side.
 
 ## Milestone 5: Document Processing Chamber
 
