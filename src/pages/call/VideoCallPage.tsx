@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
@@ -23,8 +23,12 @@ interface RemotePeer {
  */
 export const VideoCallPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // ?mode=audio joins without requesting the camera (voice call)
+  const audioOnly = searchParams.get('mode') === 'audio';
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -32,7 +36,7 @@ export const VideoCallPage: React.FC = () => {
 
   const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(!audioOnly);
   const [status, setStatus] = useState<'connecting' | 'ready' | 'error'>('connecting');
 
   const upsertPeer = useCallback((socketId: string, userName: string, stream: MediaStream) => {
@@ -100,7 +104,7 @@ export const VideoCallPage: React.FC = () => {
 
     const start = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: !audioOnly, audio: true });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -209,7 +213,7 @@ export const VideoCallPage: React.FC = () => {
       <div className="flex items-center justify-between px-6 py-4 text-white">
         <div className="flex items-center gap-2">
           <Users size={20} />
-          <span className="font-medium">Nexus Call</span>
+          <span className="font-medium">{audioOnly ? 'Nexus Voice Call' : 'Nexus Call'}</span>
           <span className="text-sm text-gray-400">
             {totalTiles} participant{totalTiles > 1 ? 's' : ''}
           </span>
@@ -274,15 +278,17 @@ export const VideoCallPage: React.FC = () => {
           {audioEnabled ? <Mic size={22} /> : <MicOff size={22} />}
         </button>
 
-        <button
-          onClick={toggleVideo}
-          className={`p-4 rounded-full transition-colors ${
-            videoEnabled ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-error-500 hover:bg-error-700 text-white'
-          }`}
-          aria-label={videoEnabled ? 'Stop video' : 'Start video'}
-        >
-          {videoEnabled ? <Video size={22} /> : <VideoOff size={22} />}
-        </button>
+        {!audioOnly && (
+          <button
+            onClick={toggleVideo}
+            className={`p-4 rounded-full transition-colors ${
+              videoEnabled ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-error-500 hover:bg-error-700 text-white'
+            }`}
+            aria-label={videoEnabled ? 'Stop video' : 'Start video'}
+          >
+            {videoEnabled ? <Video size={22} /> : <VideoOff size={22} />}
+          </button>
+        )}
 
         <button
           onClick={endCall}

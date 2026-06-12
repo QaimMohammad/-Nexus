@@ -1,8 +1,11 @@
 // Quick integration test: two authenticated socket clients exchange
 // WebRTC signaling messages through the server relay.
+// Usage: node test-signaling.mjs            (local server)
+//        $env:API_URL="https://..." ; node test-signaling.mjs   (deployed server)
 import { io } from '../node_modules/socket.io-client/build/esm/index.js';
 
-const API = 'http://localhost:5000';
+const API = process.env.API_URL || 'http://localhost:5000';
+console.log(`Testing signaling against: ${API}`);
 
 async function login(email) {
   const res = await fetch(`${API}/api/auth/login`, {

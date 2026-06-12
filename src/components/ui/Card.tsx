@@ -15,10 +15,14 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const hoverableClass = hoverable ? 'transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer' : '';
   const clickableClass = onClick ? 'cursor-pointer' : '';
-  
+  // Only apply the default background when the caller doesn't bring their own —
+  // Tailwind resolves conflicting bg-* classes by stylesheet order, not by
+  // position in the class attribute, so bg-white could override the caller's.
+  const bgClass = /\bbg-/.test(className) ? '' : 'bg-white';
+
   return (
-    <div 
-      className={`bg-white rounded-lg shadow-md overflow-hidden ${hoverableClass} ${clickableClass} ${className}`}
+    <div
+      className={`${bgClass} rounded-lg shadow-md overflow-hidden ${hoverableClass} ${clickableClass} ${className}`}
       onClick={onClick}
     >
       {children}

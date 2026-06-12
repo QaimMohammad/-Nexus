@@ -81,8 +81,20 @@ export const MeetingsPage: React.FC = () => {
       return;
     }
 
-    const startISO = new Date(`${form.date}T${form.startTime}`).toISOString();
-    const endISO = new Date(`${form.date}T${form.endTime}`).toISOString();
+    const start = new Date(`${form.date}T${form.startTime}`);
+    const end = new Date(`${form.date}T${form.endTime}`);
+
+    if (start <= new Date()) {
+      toast.error('Start time has already passed — pick a future time');
+      return;
+    }
+    if (end <= start) {
+      toast.error('End time must be after the start time');
+      return;
+    }
+
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
 
     setIsSubmitting(true);
     try {
@@ -318,6 +330,7 @@ export const MeetingsPage: React.FC = () => {
           <Input
             label="Date"
             type="date"
+            min={new Date().toISOString().slice(0, 10)}
             value={form.date}
             onChange={(e) => setForm({ ...form, date: e.target.value })}
             fullWidth

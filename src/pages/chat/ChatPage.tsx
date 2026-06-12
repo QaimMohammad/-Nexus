@@ -121,6 +121,20 @@ export const ChatPage: React.FC = () => {
                   size="sm"
                   className="rounded-full p-2"
                   aria-label="Voice call"
+                  onClick={async () => {
+                    if (!userId) return;
+                    const roomId = `chat-${[currentUser.id, userId].sort().join('-')}`;
+                    try {
+                      const msg = await messageService.sendMessage(
+                        userId,
+                        'Started a voice call - open our chat and click the phone icon to join.'
+                      );
+                      setMessages((prev) => [...prev, msg]);
+                    } catch {
+                      /* the call still works without the notification message */
+                    }
+                    navigate(`/call/${roomId}?mode=audio`);
+                  }}
                 >
                   <Phone size={18} />
                 </Button>
