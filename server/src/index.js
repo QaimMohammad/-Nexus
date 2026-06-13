@@ -17,6 +17,11 @@ const registerSocketHandlers = require('./socket');
 const app = express();
 const server = http.createServer(app);
 
+// Render (and most PaaS) terminate TLS at a proxy. Without this, every
+// client shares the proxy's IP and the rate limiter throttles all users
+// as one. Trust exactly one hop so req.ip is the real client address.
+app.set('trust proxy', 1);
+
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
   .map((origin) => origin.trim());

@@ -7,13 +7,49 @@ import { useAuth } from '../../context/AuthContext';
 import { getSocket } from '../../services/socket';
 
 const ICE_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  iceServers: [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    // Free TURN relay (Open Relay Project): used automatically only when a
+    // direct peer-to-peer path fails (strict NATs, corporate/mobile networks).
+    // The :443?transport=tcp entry gets through firewalls that block UDP.
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  ],
+  // Pre-gather candidates so connections set up faster on slow networks
+  iceCandidatePoolSize: 4
 };
+
+// 480p@24 keeps the stream stable on weak links - far smoother than letting
+// the browser default to 720p+ and choke. Audio processing flags clean up
+// echo and background noise.
+function mediaConstraints(audioOnly: boolean): MediaStreamConstraints {
+  return {
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    video: audioOnly
+      ? false
+      : { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } }
+  };
+}
+
+// Cap outgoing video so congestion never starves the audio track
+const MAX_VIDEO_BITRATE = 800_000;
+
+// How long a peer may stay disconnected before we give up on it. Brief
+// drops on high-latency networks usually self-heal well within this.
+const RECONNECT_GRACE_MS = 12_000;
 
 interface RemotePeer {
   socketId: string;
   userName: string;
   stream: MediaStream;
+  reconnecting?: boolean;
 }
 
 /**
@@ -49,18 +85,40 @@ export const VideoCallPage: React.FC = () => {
     });
   }, []);
 
-  const removePeer = useCallback((socketId: string) => {
-    const pc = peersRef.current.get(socketId);
-    if (pc) {
-      pc.close();
-      peersRef.current.delete(socketId);
+  const reconnectTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const clearReconnectTimer = useCallback((socketId: string) => {
+    const timer = reconnectTimersRef.current.get(socketId);
+    if (timer) {
+      clearTimeout(timer);
+      reconnectTimersRef.current.delete(socketId);
     }
-    setRemotePeers((prev) => prev.filter((p) => p.socketId !== socketId));
   }, []);
 
-  // Create (or reuse) a peer connection toward a given remote socket
+  const setPeerReconnecting = useCallback((socketId: string, reconnecting: boolean) => {
+    setRemotePeers((prev) =>
+      prev.map((p) => (p.socketId === socketId ? { ...p, reconnecting } : p))
+    );
+  }, []);
+
+  const removePeer = useCallback(
+    (socketId: string) => {
+      clearReconnectTimer(socketId);
+      const pc = peersRef.current.get(socketId);
+      if (pc) {
+        pc.close();
+        peersRef.current.delete(socketId);
+      }
+      setRemotePeers((prev) => prev.filter((p) => p.socketId !== socketId));
+    },
+    [clearReconnectTimer]
+  );
+
+  // Create (or reuse) a peer connection toward a given remote socket.
+  // The initiator owns negotiation: onnegotiationneeded sends the offer,
+  // both for the initial connection and for ICE restarts after a failure.
   const createPeerConnection = useCallback(
-    (remoteSocketId: string, remoteName: string) => {
+    (remoteSocketId: string, remoteName: string, isInitiator: boolean) => {
       const existing = peersRef.current.get(remoteSocketId);
       if (existing) return existing;
 
@@ -71,6 +129,38 @@ export const VideoCallPage: React.FC = () => {
       localStreamRef.current?.getTracks().forEach((track) => {
         pc.addTrack(track, localStreamRef.current as MediaStream);
       });
+
+      // Cap outgoing video bitrate so congestion never starves audio
+      pc.getSenders().forEach((sender) => {
+        if (sender.track?.kind !== 'video') return;
+        const params = sender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) {
+          params.encodings = [{}];
+        }
+        params.encodings[0].maxBitrate = MAX_VIDEO_BITRATE;
+        sender.setParameters(params).catch(() => {});
+      });
+
+      if (isInitiator) {
+        let makingOffer = false;
+        pc.onnegotiationneeded = async () => {
+          if (makingOffer) return;
+          makingOffer = true;
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('video:offer', {
+              roomId,
+              targetSocketId: remoteSocketId,
+              offer: pc.localDescription
+            });
+          } catch {
+            /* peer may have closed mid-negotiation */
+          } finally {
+            makingOffer = false;
+          }
+        };
+      }
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
@@ -86,15 +176,43 @@ export const VideoCallPage: React.FC = () => {
       };
 
       pc.onconnectionstatechange = () => {
-        if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
-          removePeer(remoteSocketId);
+        switch (pc.connectionState) {
+          case 'connected':
+            clearReconnectTimer(remoteSocketId);
+            setPeerReconnecting(remoteSocketId, false);
+            break;
+          case 'disconnected':
+            // Often transient on high-latency networks - show a hint and
+            // give WebRTC a grace period to recover on its own.
+            setPeerReconnecting(remoteSocketId, true);
+            clearReconnectTimer(remoteSocketId);
+            reconnectTimersRef.current.set(
+              remoteSocketId,
+              setTimeout(() => removePeer(remoteSocketId), RECONNECT_GRACE_MS)
+            );
+            break;
+          case 'failed':
+            setPeerReconnecting(remoteSocketId, true);
+            if (isInitiator) {
+              // Renegotiate fresh network routes (fires onnegotiationneeded)
+              pc.restartIce();
+            }
+            clearReconnectTimer(remoteSocketId);
+            reconnectTimersRef.current.set(
+              remoteSocketId,
+              setTimeout(() => removePeer(remoteSocketId), RECONNECT_GRACE_MS)
+            );
+            break;
+          case 'closed':
+            removePeer(remoteSocketId);
+            break;
         }
       };
 
       peersRef.current.set(remoteSocketId, pc);
       return pc;
     },
-    [removePeer, upsertPeer]
+    [removePeer, upsertPeer, clearReconnectTimer, setPeerReconnecting, roomId]
   );
 
   useEffect(() => {
@@ -104,7 +222,7 @@ export const VideoCallPage: React.FC = () => {
 
     const start = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: !audioOnly, audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia(mediaConstraints(audioOnly));
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -113,17 +231,16 @@ export const VideoCallPage: React.FC = () => {
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
         setStatus('ready');
 
-        // A new peer joined: we (an existing peer) initiate the offer
-        socket.on('video:user-joined', async ({ socketId, userName }) => {
-          const pc = createPeerConnection(socketId, userName);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socket.emit('video:offer', { roomId, targetSocketId: socketId, offer });
+        // A new peer joined: we (an existing peer) initiate; the offer is
+        // sent by onnegotiationneeded once our tracks are attached
+        socket.on('video:user-joined', ({ socketId, userName }) => {
+          createPeerConnection(socketId, userName, true);
         });
 
-        // Received an offer: answer it
+        // Received an offer: answer it (also handles ICE-restart offers,
+        // which arrive on the same connection after a network failure)
         socket.on('video:offer', async ({ from, userName, offer }) => {
-          const pc = createPeerConnection(from, userName);
+          const pc = createPeerConnection(from, userName, false);
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -169,6 +286,8 @@ export const VideoCallPage: React.FC = () => {
       socket.off('video:user-left');
       peersRef.current.forEach((pc) => pc.close());
       peersRef.current.clear();
+      reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reconnectTimersRef.current.clear();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -324,6 +443,12 @@ const RemoteVideo: React.FC<{ peer: RemotePeer }> = ({ peer }) => {
   return (
     <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center">
       <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
+      {peer.reconnecting && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white mb-2" />
+          <p className="text-white text-sm">Reconnecting...</p>
+        </div>
+      )}
       <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 text-white text-sm">
         {peer.userName}
       </span>
