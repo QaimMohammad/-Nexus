@@ -34,9 +34,12 @@ import { PaymentsPage } from './pages/payments/PaymentsPage';
 // Chat Pages
 import { ChatPage } from './pages/chat/ChatPage';
 
+import { ServerWarmupBanner } from './components/ui/ServerWarmupBanner';
+
 function App() {
   return (
     <AuthProvider>
+      <ServerWarmupBanner />
       <Router>
         <Routes>
           {/* Authentication Routes */}

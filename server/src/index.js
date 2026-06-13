@@ -85,6 +85,32 @@ registerSocketHandlers(io);
 
 const PORT = process.env.PORT || 5000;
 
+/**
+ * Render's free tier suspends the service after ~15 minutes with no inbound
+ * traffic, causing a ~60s cold start for the next visitor. A self-ping every
+ * 12 minutes keeps inbound traffic flowing so the instance never idles out.
+ *
+ * Reliable because the timer runs inside this always-live process (unlike
+ * GitHub Actions cron, which is heavily throttled). Render auto-provides
+ * RENDER_EXTERNAL_URL. Disable with KEEP_ALIVE=false.
+ *
+ * Note: a perpetually-warm free service consumes ~all 750 free instance-hours
+ * per month, shared across your free Render services.
+ */
+function startKeepAlive() {
+  const url = process.env.RENDER_EXTERNAL_URL;
+  if (!url || process.env.KEEP_ALIVE === 'false') return;
+
+  const TWELVE_MIN = 12 * 60 * 1000;
+  setInterval(() => {
+    fetch(`${url}/api/health`).catch((err) =>
+      console.warn('Keep-alive ping failed:', err.message)
+    );
+  }, TWELVE_MIN).unref(); // don't hold the process open on shutdown
+
+  console.log(`Keep-alive self-ping enabled for ${url} (every 12 min)`);
+}
+
 connectDB()
   .then(async () => {
     // The in-memory dev database starts empty on every boot - seed it so
@@ -95,6 +121,7 @@ connectDB()
     }
     server.listen(PORT, () => {
       console.log(`Nexus API listening on port ${PORT}`);
+      startKeepAlive();
     });
   })
   .catch((err) => {
