@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { User, CircleDollarSign, Building2, LogIn, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
@@ -17,6 +17,17 @@ export const LoginPage: React.FC = () => {
 
   const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Set when an authenticated page (e.g. a shared call link) sent the
+  // visitor here - go back there after login instead of the dashboard.
+  const redirectTo = searchParams.get('redirect');
+
+  const postLoginPath = () =>
+    redirectTo && redirectTo.startsWith('/')
+      ? redirectTo
+      : role === 'entrepreneur'
+      ? '/dashboard/entrepreneur'
+      : '/dashboard/investor';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,8 +42,7 @@ export const LoginPage: React.FC = () => {
         setIsLoading(false);
         return;
       }
-      // Redirect based on user role
-      navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      navigate(postLoginPath());
     } catch (err) {
       setError((err as Error).message);
       setIsLoading(false);
@@ -46,7 +56,7 @@ export const LoginPage: React.FC = () => {
 
     try {
       await verifyOtp(otp);
-      navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      navigate(postLoginPath());
     } catch (err) {
       setError((err as Error).message);
       setIsLoading(false);
@@ -258,7 +268,10 @@ export const LoginPage: React.FC = () => {
             <div className="mt-2 text-center">
               <p className="text-sm text-gray-600">
                 Don't have an account?{' '}
-                <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
+                <Link
+                  to={redirectTo ? `/register?redirect=${encodeURIComponent(redirectTo)}` : '/register'}
+                  className="font-medium text-primary-600 hover:text-primary-500"
+                >
                   Sign up
                 </Link>
               </p>

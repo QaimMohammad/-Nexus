@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
@@ -24,7 +24,7 @@ interface RemotePeer {
 export const VideoCallPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   // ?mode=audio joins without requesting the camera (voice call)
@@ -201,7 +201,20 @@ export const VideoCallPage: React.FC = () => {
     toast.success('Call link copied — share it to invite others');
   };
 
-  if (!user) return null;
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 bg-gray-900 flex items-center justify-center z-40">
+        <p className="text-white">Connecting...</p>
+      </div>
+    );
+  }
+
+  // Call links are shareable: visitors without a session sign in (or
+  // register) first and are sent straight back to this room afterwards.
+  if (!user) {
+    const returnTo = `/call/${roomId}${audioOnly ? '?mode=audio' : ''}`;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(returnTo)}`} replace />;
+  }
 
   // Grid sizing based on participant count
   const totalTiles = remotePeers.length + 1;

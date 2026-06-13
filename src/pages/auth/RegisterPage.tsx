@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { User, Mail, Lock, CircleDollarSign, Building2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
@@ -17,23 +17,31 @@ export const RegisterPage: React.FC = () => {
   
   const { register } = useAuth();
   const navigate = useNavigate();
-  
+  const [searchParams] = useSearchParams();
+  // Carried over from a shared link (e.g. a call invite) via the login page
+  const redirectTo = searchParams.get('redirect');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
+
     // Validate passwords match
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       await register(name, email, password, role);
-      // Redirect based on user role
-      navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      navigate(
+        redirectTo && redirectTo.startsWith('/')
+          ? redirectTo
+          : role === 'entrepreneur'
+          ? '/dashboard/entrepreneur'
+          : '/dashboard/investor'
+      );
     } catch (err) {
       setError((err as Error).message);
       setIsLoading(false);
