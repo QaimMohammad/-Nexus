@@ -31,7 +31,7 @@ payment wallet.
 │       ├── middleware/   # auth (protect/authorize), validation, error handler
 │       ├── socket/       # Socket.IO: presence, chat, WebRTC signaling
 │       └── seedData.js   # Demo data seeding
-└── docs/                 # API.md, weekly documentation
+└── nexus-docs/           # API reference, Postman collection, demo deck
 ```
 
 ## Getting started (local)
@@ -90,8 +90,9 @@ Backend (`server/.env`): see [server/.env.example](server/.env.example)
 1. Import the repo (framework: Vite). `vercel.json` already handles SPA rewrites.
 2. Set `VITE_API_URL=https://<your-render-app>.onrender.com`.
 
-## API documentation
+## Documentation
 
-See [docs/API.md](docs/API.md) for every endpoint, the Socket.IO event
-reference, and error-code conventions. Weekly progress reports live in
-[docs/](docs/).
+See [nexus-docs/API.md](nexus-docs/API.md) for every endpoint, the Socket.IO
+event reference, and error-code conventions. The
+[Postman collection](nexus-docs/Nexus.postman_collection.json) and the demo
+deck also live in [nexus-docs/](nexus-docs/).
